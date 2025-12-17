@@ -23,6 +23,7 @@ export class GameEngine {
     this.chat = this.chat.bind(this);
     this.status = this.status.bind(this);
     this.updateSetting = this.updateSetting.bind(this);
+    this.handleInput = this.handleInput.bind(this);
   }
 
   async start() {
@@ -52,7 +53,10 @@ export class GameEngine {
     this.hasSavedState = false; 
     console.log(`%c[GAME] Persistence Override: Always spawning at chunk default.`, LOG_STYLES.sys);
 
-    // 5. Start Loop
+    // 5. Setup Input
+    document.getElementById('game-container').addEventListener('pointerdown', this.handleInput);
+
+    // 6. Start Loop
     this.isRunning = true;
     this.gameLoop();
     
@@ -77,6 +81,13 @@ export class GameEngine {
     requestAnimationFrame(() => this.gameLoop());
 
     const now = Date.now();
+    const dt = Math.min((now - (this.lastFrameTime || now)) / 1000, 0.1); // Cap dt
+    this.lastFrameTime = now;
+
+    // 0. Player Logic
+    if (this.gameState === 'GAME') {
+        this.player.update(dt);
+    }
 
     // 1. Network Sync (Presence) - High Frequency
     this.network.broadcastPresence();
@@ -115,6 +126,25 @@ export class GameEngine {
       return true;
     }
     return false;
+  }
+
+  handleInput(e) {
+      if (this.gameState !== 'GAME') return;
+      if (!this.renderer) return;
+
+      // Only handle primary click
+      if (e.button !== 0) return;
+
+      const point = this.renderer.getInteractionPoint(e.clientX, e.clientY);
+      if (point) {
+          this.player.walkTo(point.x, point.z);
+          
+          // Visual feedback (optional console log)
+          // console.log("Moving to", point);
+          
+          // Create a small temporary marker?
+          // For now just movement.
+      }
   }
 
   async enterGame() {

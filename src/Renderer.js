@@ -67,11 +67,31 @@ export class Renderer {
         this.playerMesh.castShadow = true;
         this.scene.add(this.playerMesh);
 
+        // Raycaster for click-to-move
+        this.raycaster = new THREE.Raycaster();
+
         // Fallback Ground
         this.createGround(1024, 1024);
 
         // Handle Resize
         window.addEventListener('resize', this.onWindowResize.bind(this));
+    }
+
+    // Raycast helper for input
+    getInteractionPoint(clientX, clientY) {
+        if (!this.ground || !this.camera) return null;
+        
+        const mouse = new THREE.Vector2();
+        mouse.x = (clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+
+        this.raycaster.setFromCamera(mouse, this.camera);
+        
+        const intersects = this.raycaster.intersectObject(this.ground);
+        if (intersects.length > 0) {
+            return intersects[0].point;
+        }
+        return null;
     }
 
     async createGround(width, depth, chunkData = null) {
@@ -138,8 +158,10 @@ export class Renderer {
         let mapTexture = null;
         if (terrainConfig.texture) {
             mapTexture = await textureLoader.loadAsync(terrainConfig.texture);
-            mapTexture.wrapS = THREE.ClampToEdgeWrapping;
-            mapTexture.wrapT = THREE.ClampToEdgeWrapping;
+            // High Density repetition for HD look
+            mapTexture.wrapS = THREE.RepeatWrapping;
+            mapTexture.wrapT = THREE.RepeatWrapping;
+            mapTexture.repeat.set(64, 64);
             mapTexture.colorSpace = THREE.SRGBColorSpace;
         }
 
@@ -220,6 +242,74 @@ export class Renderer {
         this.scene.add(this.ground);
         
         console.log("Renderer: Heightmap applied.");
+
+        // Generate Grass
+        this.generateGrass(width, depth);
+    }
+
+    generateGrass(width, depth) {
+        console.log("Renderer: Generating dense grass...");
+        const instanceCount = 40000;
+        
+        // Simple blade geometry (two intersecting planes)
+        const geometry = new THREE.PlaneGeometry(0.8, 1.2);
+        geometry.translate(0, 0.6, 0); // Pivot at bottom
+
+        const material = new THREE.MeshStandardMaterial({
+            color: 0x228822,
+            roughness: 1.0,
+            side: THREE.DoubleSide,
+            alphaTest: 0.5
+        });
+
+        const mesh = new THREE.InstancedMesh(geometry, material, instanceCount);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+
+        const dummy = new THREE.Object3D();
+        const _pos = new THREE.Vector3();
+        const _scale = new THREE.Vector3();
+
+        for (let i = 0; i < instanceCount; i++) {
+            // Random position
+            const x = Math.random() * width;
+            const z = Math.random() * depth;
+            
+            // Get Height
+            const y = this.getTerrainHeight(x, z);
+            
+            // Don't spawn under water (assuming water is at y=10ish) or too high on rocks
+            if (y < 2 || y > 60) {
+                 // Hide instance by scaling to 0
+                 dummy.position.set(0, -100, 0);
+                 dummy.scale.set(0,0,0);
+            } else {
+                dummy.position.set(x, y, z);
+                dummy.rotation.y = Math.random() * Math.PI;
+                // Random scale
+                const s = 0.8 + Math.random() * 0.5;
+                dummy.scale.set(s, s, s);
+                // Random tilt
+                dummy.rotation.x = (Math.random() - 0.5) * 0.2;
+                dummy.rotation.z = (Math.random() - 0.5) * 0.2;
+            }
+
+            dummy.updateMatrix();
+            mesh.setMatrixAt(i, dummy.matrix);
+            
+            // Optional: Color variation
+            if (i % 2 === 0) {
+                 mesh.setColorAt(i, new THREE.Color(0x228822));
+            } else {
+                 mesh.setColorAt(i, new THREE.Color(0x339933));
+            }
+        }
+        
+        mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+        
+        this.scene.add(mesh);
+        console.log("Renderer: Grass generated.");
     }
 
     loadImage(src) {
