@@ -11,6 +11,15 @@ export const CONFIG = {
   ]
 };
 
+export const DEFAULT_SETTINGS = {
+  enableWebGPU: true,
+  enableVR: false,
+  enableAudio: true,
+  debugChunks: false,
+  networkInterpolation: true,
+  maxRenderDistance: 4
+};
+
 export const LOG_STYLES = {
   sys: 'color: #00ff00; font-weight: bold;',
   warn: 'color: #ffff00;',

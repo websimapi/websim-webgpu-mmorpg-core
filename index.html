@@ -6,13 +6,17 @@
     <title>WebGPU MMORPG Core</title>
     <style>
         body {
-            background-color: #0f0f0f;
+            background-color: #050505;
             color: #00ff00;
             font-family: 'Courier New', Courier, monospace;
             margin: 0;
-            padding: 20px;
+            padding: 0;
             overflow: hidden;
+            width: 100vw;
+            height: 100vh;
         }
+        
+        /* Debug Console UI */
         #ui-layer {
             position: absolute;
             top: 0;
@@ -25,12 +29,14 @@
             justify-content: flex-end;
             padding: 20px;
             box-sizing: border-box;
+            z-index: 100;
         }
         #console-out {
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.85);
             padding: 10px;
             border: 1px solid #00ff00;
             flex-grow: 1;
+            max-height: 300px; /* Limit height */
             overflow-y: auto;
             pointer-events: auto;
             text-shadow: 0 0 5px #00ff00;
@@ -59,19 +65,103 @@
             font-size: 16px;
             outline: none;
         }
-        h1 {
+
+        /* Title Screen */
+        #title-screen, #settings-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at center, #1a1a1a 0%, #000000 100%);
+            z-index: 50;
+            transition: opacity 0.5s;
+        }
+        
+        .game-title {
+            font-size: 4rem;
+            color: #00ff00;
+            text-shadow: 0 0 20px #00ff00, 0 0 10px #003300;
+            margin-bottom: 2rem;
             text-align: center;
-            border-bottom: 1px solid #333;
-            padding-bottom: 10px;
+            letter-spacing: 5px;
+        }
+
+        .menu-btn {
+            background: transparent;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 15px 40px;
+            margin: 10px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            width: 300px;
+        }
+        .menu-btn:hover {
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 15px #00ff00;
+        }
+
+        /* Settings */
+        .settings-panel {
+            background: rgba(0, 20, 0, 0.9);
+            border: 1px solid #00ff00;
+            padding: 40px;
+            width: 500px;
+            max-width: 90%;
+        }
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+        }
+        .toggle {
+            cursor: pointer;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #00ff00;
+            display: inline-block;
+        }
+        .toggle.checked {
+            background: #00ff00;
+            box-shadow: 0 0 10px #00ff00;
+        }
+
+        .hidden {
+            display: none !important;
         }
     </style>
 </head>
 <body>
 
-    <h1>MMORPG CORE: SPAWN CHUNK</h1>
-    <p>Check browser console (F12) for engine interaction.</p>
+    <!-- Title Screen -->
+    <div id="title-screen">
+        <h1 class="game-title">SPAWN CHUNK</h1>
+        <button class="menu-btn" id="btn-start">Start Game</button>
+        <button class="menu-btn" id="btn-settings">Settings</button>
+    </div>
 
-    <div id="ui-layer">
+    <!-- Settings Screen -->
+    <div id="settings-screen" class="hidden">
+        <h1 class="game-title">SYSTEM SETTINGS</h1>
+        <div class="settings-panel" id="settings-list">
+            <!-- Populated via JS -->
+        </div>
+        <button class="menu-btn" id="btn-back">Back</button>
+    </div>
+
+    <!-- Debug Console (Hidden by default) -->
+    <div id="ui-layer" class="hidden">
         <div id="console-out">Initializing System...<br></div>
         <div class="input-line">
             <span>></span>
@@ -82,26 +172,113 @@
     <!-- Scripts -->
     <script type="module">
         import { GameEngine } from './src/Engine.js';
+        import { DEFAULT_SETTINGS } from './src/Constants.js';
+
+        let isCreator = false;
 
         // Initialize Game
         async function init() {
             try {
+                // Check Creator Status
+                const creator = await window.websim.getCreatedBy();
+                const user = await window.websim.getCurrentUser();
+                isCreator = creator && user && creator.username === user.username;
+                
+                if (isCreator) {
+                    logSystem("Welcome Creator. Press '~' to toggle Debug Console.", '#00ffaa');
+                }
+
+                // Setup Engine
                 window.game = new GameEngine();
                 await window.game.start();
                 
-                logSystem("Game Ready. Type commands below or use DevTools console.");
-                logSystem("Try: 'move 10 0 0' or 'help'");
-                
-                // Focus input
-                document.getElementById('cmd-input').focus();
+                logSystem("Game Engine Ready.");
+
+                // Initialize Settings UI
+                renderSettings();
+
             } catch (e) {
                 console.error(e);
                 logSystem(`CRITICAL ERROR: ${e.message}`, 'red');
             }
         }
 
+        // --- UI Interactions ---
+
+        // Title Screen Buttons
+        document.getElementById('btn-start').addEventListener('click', () => {
+            document.getElementById('title-screen').classList.add('hidden');
+            window.game.gameState = 'GAME';
+            logSystem("Entering World...");
+        });
+
+        document.getElementById('btn-settings').addEventListener('click', () => {
+            document.getElementById('title-screen').classList.add('hidden');
+            document.getElementById('settings-screen').classList.remove('hidden');
+            window.game.gameState = 'SETTINGS';
+        });
+
+        document.getElementById('btn-back').addEventListener('click', () => {
+            document.getElementById('settings-screen').classList.add('hidden');
+            document.getElementById('title-screen').classList.remove('hidden');
+            window.game.gameState = 'TITLE';
+        });
+
+        // Settings Logic
+        function renderSettings() {
+            const list = document.getElementById('settings-list');
+            list.innerHTML = '';
+            
+            Object.keys(DEFAULT_SETTINGS).forEach(key => {
+                const row = document.createElement('div');
+                row.className = 'setting-row';
+                
+                const label = document.createElement('span');
+                label.textContent = key.replace(/([A-Z])/g, ' $1').toUpperCase(); // Format camelCase
+                
+                // For boolean settings
+                if (typeof DEFAULT_SETTINGS[key] === 'boolean') {
+                    const toggle = document.createElement('div');
+                    toggle.className = `toggle ${DEFAULT_SETTINGS[key] ? 'checked' : ''}`;
+                    toggle.onclick = () => {
+                        const newVal = !toggle.classList.contains('checked');
+                        toggle.classList.toggle('checked');
+                        window.game.updateSetting(key, newVal);
+                        logSystem(`Setting ${key} changed to ${newVal}`, '#aaa');
+                    };
+                    row.appendChild(label);
+                    row.appendChild(toggle);
+                } else {
+                    // For number/other settings
+                    const valDisplay = document.createElement('span');
+                    valDisplay.textContent = DEFAULT_SETTINGS[key];
+                    row.appendChild(label);
+                    row.appendChild(valDisplay);
+                }
+                
+                list.appendChild(row);
+            });
+        }
+
+        // Global Key Listeners
+        window.addEventListener('keydown', (e) => {
+            // Creator Console Toggle
+            if (e.key === '`' || e.key === '~') {
+                if (isCreator) {
+                    e.preventDefault();
+                    const ui = document.getElementById('ui-layer');
+                    ui.classList.toggle('hidden');
+                    const isVisible = !ui.classList.contains('hidden');
+                    if (isVisible) document.getElementById('cmd-input').focus();
+                }
+            }
+        });
+
+        // --- Existing Console Logic ---
+
         function logSystem(msg, color = '#00ff00') {
             const el = document.getElementById('console-out');
+            if (!el) return;
             const div = document.createElement('div');
             div.style.color = color;
             div.textContent = `> ${msg}`;
@@ -109,7 +286,6 @@
             el.scrollTop = el.scrollHeight;
         }
 
-        // Command Parser
         const input = document.getElementById('cmd-input');
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
@@ -129,7 +305,7 @@
 
             const parts = raw.split(/\s+/);
             const cmd = parts[0].toLowerCase();
-            const args = parts.slice(1).map(Number); // Convert args to numbers
+            const args = parts.slice(1).map(Number);
 
             try {
                 let res;

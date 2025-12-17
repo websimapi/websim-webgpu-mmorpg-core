@@ -1,7 +1,7 @@
 import { DatabaseManager } from './Database.js';
 import { NetworkManager } from './Network.js';
 import { Player } from './Player.js';
-import { CONFIG, LOG_STYLES } from './Constants.js';
+import { CONFIG, LOG_STYLES, DEFAULT_SETTINGS } from './Constants.js';
 
 export class GameEngine {
   constructor() {
@@ -10,12 +10,15 @@ export class GameEngine {
     this.db = null; // Initialized after network
     this.lastSaveTime = 0;
     this.isRunning = false;
+    this.gameState = 'TITLE'; // TITLE, SETTINGS, GAME
+    this.settings = { ...DEFAULT_SETTINGS };
 
     // Bind methods for safe console usage
     this.move = this.move.bind(this);
     this.tp = this.tp.bind(this);
     this.chat = this.chat.bind(this);
     this.status = this.status.bind(this);
+    this.updateSetting = this.updateSetting.bind(this);
   }
 
   async start() {
@@ -79,9 +82,19 @@ export class GameEngine {
     await this.db.saveSlot(1, posData);
   }
 
+  updateSetting(key, value) {
+    if (key in this.settings) {
+      this.settings[key] = value;
+      console.log(`%c[SETTINGS] ${key} -> ${value}`, LOG_STYLES.sys);
+      return true;
+    }
+    return false;
+  }
+
   // --- Exposed Console API ---
 
   move(x, y, z) { 
+    if (this.gameState !== 'GAME') return "Cannot move while in Title/Settings screen.";
     this.player.move(x, y, z); 
     return `Moved to [${this.player.position.x.toFixed(2)}, ${this.player.position.y.toFixed(2)}, ${this.player.position.z.toFixed(2)}]`;
   }
