@@ -10,7 +10,7 @@
   },
   "spawnPoint": {
     "x": 512,
-    "y": 2,
+    "y": 50,
     "z": 512,
     "facing": 180
   },
@@ -50,22 +50,12 @@
       "description": "High value loot zone."
     }
   ],
-  "staticObjects": [
-    { "type": "monolith", "x": 512, "y": 0, "z": 512, "sx": 10, "sy": 30, "sz": 10, "color": "#00ffaa" },
-    { "type": "tower", "x": 420, "y": 0, "z": 420, "sx": 20, "sy": 60, "sz": 20, "color": "#333333" },
-    { "type": "tower", "x": 604, "y": 0, "z": 420, "sx": 20, "sy": 60, "sz": 20, "color": "#333333" },
-    { "type": "tower", "x": 420, "y": 0, "z": 604, "sx": 20, "sy": 60, "sz": 20, "color": "#333333" },
-    { "type": "tower", "x": 604, "y": 0, "z": 604, "sx": 20, "sy": 60, "sz": 20, "color": "#333333" },
-    { "type": "arch", "x": 512, "y": 0, "z": 350, "sx": 40, "sy": 20, "sz": 10, "color": "#555555" },
-    { "type": "tree", "x": 480, "y": 0, "z": 480, "sx": 2, "sy": 8, "sz": 2, "color": "#00ff00" },
-    { "type": "tree", "x": 544, "y": 0, "z": 480, "sx": 2, "sy": 9, "sz": 2, "color": "#00ff00" },
-    { "type": "tree", "x": 480, "y": 0, "z": 544, "sx": 2, "sy": 7, "sz": 2, "color": "#00ff00" },
-    { "type": "tree", "x": 544, "y": 0, "z": 544, "sx": 2, "sy": 8, "sz": 2, "color": "#00ff00" }
-  ],
+  "staticObjects": [],
   "terrainMap": {
-    "type": "heightmap_reference",
-    "resolution": 64,
-    "data_layout": "row_major",
+    "type": "image",
+    "src": "terrain_heightmap.png",
+    "texture": "terrain_diffuse.png",
+    "heightScale": 100,
     "base_height": 0
   }
 }

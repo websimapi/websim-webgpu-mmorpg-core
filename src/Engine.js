@@ -90,6 +90,15 @@ export class GameEngine {
     // 3. Render
     if (this.renderer) {
       this.renderer.update(this.player, this.network.peers, this.network.room.clientId);
+      
+      // Gravity / Ground Snap (Simple version)
+      if (this.gameState === 'GAME' && !this.player.isSpectator) {
+         const groundH = this.renderer.getTerrainHeight(this.player.position.x, this.player.position.z);
+         // Keep player above ground
+         if (this.player.position.y < groundH) {
+             this.player.position.y = groundH;
+         }
+      }
     }
   }
 
@@ -119,16 +128,19 @@ export class GameEngine {
       
       // Pass world data to renderer
       if (this.renderer) {
-        this.renderer.setChunkData(this.chunkData);
+        await this.renderer.setChunkData(this.chunkData);
       }
 
       this.gameState = 'GAME';
 
       if (!this.hasSavedState) {
         const sp = this.chunkData.spawnPoint;
-        // Ensure teleport is respecting the terrain
-        this.player.teleport(sp.x, sp.y, sp.z);
-        this.logToUI(`Spawned at ${this.chunkData.name} [${sp.x}, ${sp.y}, ${sp.z}]`);
+        // Adjust for terrain height immediately
+        const groundH = this.renderer.getTerrainHeight(sp.x, sp.z);
+        const spawnY = Math.max(sp.y, groundH);
+        
+        this.player.teleport(sp.x, spawnY, sp.z);
+        this.logToUI(`Spawned at ${this.chunkData.name} [${sp.x}, ${spawnY}, ${sp.z}]`);
       } else {
         this.logToUI(`Resumed at [${this.player.position.x}, ${this.player.position.y}, ${this.player.position.z}]`);
       }

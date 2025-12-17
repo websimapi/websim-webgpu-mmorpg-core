@@ -74,69 +74,234 @@ export class Renderer {
         window.addEventListener('resize', this.onWindowResize.bind(this));
     }
 
-    createGround(width, depth, chunkData = null) {
+    async createGround(width, depth, chunkData = null) {
         // Cleanup old
         if(this.ground) {
             this.scene.remove(this.ground);
-            this.ground.geometry.dispose();
-            this.ground.material.dispose();
+            if(this.ground.geometry) this.ground.geometry.dispose();
+            if(this.ground.material) this.ground.material.dispose();
         }
         if(this.grid) {
             this.scene.remove(this.grid);
         }
-        
-        // If chunk data provided, use it
-        const color = chunkData && chunkData.environment ? chunkData.environment.ambientColor : 0x1a1a1a;
-        
-        // Terrain
-        const geo = new THREE.PlaneGeometry(width, depth, 128, 128); // Higher segment count for vertex displacement if needed
-        const mat = new THREE.MeshStandardMaterial({ 
-            color: 0x222222, 
-            roughness: 0.8, 
-            metalness: 0.2,
-            wireframe: false
-        });
-        
-        this.ground = new THREE.Mesh(geo, mat);
-        this.ground.rotation.x = -Math.PI / 2;
-        this.ground.position.set(width/2, 0, depth/2); 
-        this.ground.receiveShadow = true;
-        this.scene.add(this.ground);
 
-        // Grid (Subtle)
-        this.grid = new THREE.GridHelper(width, 128, 0x444444, 0x111111);
-        this.grid.position.set(width/2, 0.1, depth/2);
-        this.scene.add(this.grid);
+        // Check for heightmap
+        if (chunkData && chunkData.terrainMap && chunkData.terrainMap.type === 'image') {
+            await this.createHeightmapTerrain(width, depth, chunkData.terrainMap);
+        } else {
+            // Fallback flat terrain
+            const geo = new THREE.PlaneGeometry(width, depth, 128, 128);
+            const mat = new THREE.MeshStandardMaterial({ 
+                color: 0x222222, 
+                roughness: 0.8, 
+                metalness: 0.2,
+                wireframe: false
+            });
+            
+            this.ground = new THREE.Mesh(geo, mat);
+            this.ground.rotation.x = -Math.PI / 2;
+            this.ground.position.set(width/2, 0, depth/2); 
+            this.ground.receiveShadow = true;
+            this.scene.add(this.ground);
+
+            // Grid (Subtle)
+            this.grid = new THREE.GridHelper(width, 128, 0x444444, 0x111111);
+            this.grid.position.set(width/2, 0.1, depth/2);
+            this.scene.add(this.grid);
+        }
 
         // Visualize Regions if available
         if (chunkData && chunkData.regions) {
             chunkData.regions.forEach(region => {
                 const b = region.bounds;
-                // Regions are defined with x, z, width, depth.
-                // Center of the box should be at x + w/2, z + d/2
-                const rGeo = new THREE.BoxGeometry(b.width, 20, b.depth);
+                const rGeo = new THREE.BoxGeometry(b.width, 100, b.depth);
                 const rColor = region.pvp ? 0xff0000 : 0x00ff00;
                 const rMat = new THREE.MeshBasicMaterial({ 
                     color: rColor, 
                     transparent: true, 
-                    opacity: 0.1,
-                    wireframe: true
+                    opacity: 0.05,
+                    wireframe: true,
+                    depthWrite: false
                 });
                 const rMesh = new THREE.Mesh(rGeo, rMat);
-                // Position: x is corner in data, so + width/2
-                rMesh.position.set(b.x + b.width/2, 10, b.z + b.depth/2);
+                rMesh.position.set(b.x + b.width/2, 50, b.z + b.depth/2);
                 this.scene.add(rMesh);
-
-                // Label (Console only for now)
-                console.log(`Rendering Region: ${region.name} at [${b.x}, ${b.z}]`);
             });
         }
     }
 
-    setChunkData(data) {
+    async createHeightmapTerrain(width, depth, terrainConfig) {
+        console.log("Renderer: Generating Heightmap Terrain...");
+        const textureLoader = new THREE.TextureLoader();
+        
+        // Load Diffuse Texture
+        let mapTexture = null;
+        if (terrainConfig.texture) {
+            mapTexture = await textureLoader.loadAsync(terrainConfig.texture);
+            mapTexture.wrapS = THREE.ClampToEdgeWrapping;
+            mapTexture.wrapT = THREE.ClampToEdgeWrapping;
+            mapTexture.colorSpace = THREE.SRGBColorSpace;
+        }
+
+        // Load Heightmap Image
+        const heightImage = await this.loadImage(terrainConfig.src);
+        const { data, imgWidth, imgHeight } = this.getImageData(heightImage);
+
+        // Create Geometry
+        // Resolution matches image or capped for performance
+        const segmentsW = 256; 
+        const segmentsH = 256;
+        const geometry = new THREE.PlaneGeometry(width, depth, segmentsW, segmentsH);
+        geometry.rotateX(-Math.PI / 2);
+
+        // Modify Vertices
+        const posAttribute = geometry.attributes.position;
+        const vertex = new THREE.Vector3();
+        const heightScale = terrainConfig.heightScale || 50;
+
+        // Save height data for physics/gameplay lookups
+        this.heightData = {
+            width: segmentsW,
+            depth: segmentsH,
+            worldWidth: width,
+            worldDepth: depth,
+            scale: heightScale,
+            grid: new Float32Array((segmentsW + 1) * (segmentsH + 1))
+        };
+
+        for (let i = 0; i < posAttribute.count; i++) {
+            vertex.fromBufferAttribute(posAttribute, i);
+            
+            // Map vertex (x, z) to image UV
+            // Vertex coords are centered around 0,0 in PlaneGeometry before we offset it later
+            // x: -width/2 to width/2 -> 0 to 1
+            // z: -depth/2 to depth/2 -> 0 to 1
+            // (Note: PlaneGeometry is created on XY plane, then rotated. After rotation:
+            // X is X, Y is -Z (depth). So we use x and z (which was y).
+            
+            const u = (vertex.x + width / 2) / width;
+            const v = (vertex.z + depth / 2) / depth; // V is usually 1-y but let's see orientation
+
+            // Sample image
+            // v needs to be flipped because image coords are top-left usually, texture uv is bottom-left
+            const px = Math.floor(u * (imgWidth - 1));
+            const py = Math.floor((1 - v) * (imgHeight - 1));
+
+            const pixelIndex = (py * imgWidth + px) * 4;
+            const r = data[pixelIndex];
+            
+            // Normalize 0-255 -> 0-1
+            const height = (r / 255) * heightScale;
+            
+            vertex.y = height;
+            posAttribute.setY(i, height);
+
+            // Store in our height grid for lookup
+            // Mesh is rotated -90 X. 
+            // We need to match the vertex index layout of PlaneGeometry
+            this.heightData.grid[i] = height;
+        }
+
+        geometry.computeVertexNormals();
+
+        const material = new THREE.MeshStandardMaterial({
+            color: mapTexture ? 0xffffff : 0x556655,
+            map: mapTexture,
+            roughness: 0.8,
+            metalness: 0.1,
+            side: THREE.FrontSide
+        });
+
+        this.ground = new THREE.Mesh(geometry, material);
+        // Position it so corner is at 0,0 like the game logic expects
+        // PlaneGeometry center is 0,0. 
+        this.ground.position.set(width / 2, 0, depth / 2);
+        this.ground.receiveShadow = true;
+        this.scene.add(this.ground);
+        
+        console.log("Renderer: Heightmap applied.");
+    }
+
+    loadImage(src) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = src;
+            img.crossOrigin = 'Anonymous';
+        });
+    }
+
+    getImageData(image) {
+        const canvas = document.createElement('canvas');
+        canvas.width = image.width;
+        canvas.height = image.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(image, 0, 0);
+        return {
+            data: ctx.getImageData(0, 0, image.width, image.height).data,
+            imgWidth: image.width,
+            imgHeight: image.height
+        };
+    }
+
+    // Helper to get terrain height at world coordinates
+    getTerrainHeight(x, z) {
+        if (!this.ground || !this.heightData) return 0;
+        
+        // Transform world x,z to local 0..1
+        // Ground is at width/2, depth/2. 
+        // World 0 is at (groundPos.x - width/2)
+        // Actually, we placed ground at (width/2, 0, depth/2)
+        // So World 0,0 corresponds to left-bottom edge of plane geometry.
+        
+        const u = x / this.heightData.worldWidth;
+        const v = z / this.heightData.worldDepth; // PlaneGeometry matches 1-v for Z usually due to texture coords
+
+        if (u < 0 || u > 1 || v < 0 || v > 1) return 0;
+
+        // Bilinear interpolation or simple nearest for now
+        // PlaneGeometry has segmentsW columns and segmentsH rows.
+        // Vertices = (segmentsW + 1) * (segmentsH + 1)
+        
+        const gridW = this.heightData.width + 1;
+        const gridH = this.heightData.depth + 1;
+        
+        const gx = u * (gridW - 1);
+        const gy = (1 - v) * (gridH - 1); // Flip V to match loop above
+        
+        const ix = Math.floor(gx);
+        const iy = Math.floor(gy);
+        
+        // Clamp
+        if (ix < 0 || ix >= gridW - 1 || iy < 0 || iy >= gridH - 1) return 0;
+
+        // Get 4 neighbors from flat array
+        // Row major? PlaneGeometry creates row by row.
+        const i1 = iy * gridW + ix;
+        const i2 = i1 + 1;
+        const i3 = (iy + 1) * gridW + ix;
+        const i4 = i3 + 1;
+
+        const h1 = this.heightData.grid[i1];
+        const h2 = this.heightData.grid[i2];
+        const h3 = this.heightData.grid[i3];
+        const h4 = this.heightData.grid[i4];
+        
+        const fx = gx - ix;
+        const fy = gy - iy;
+
+        // Simple bilinear
+        const top = h1 * (1 - fx) + h2 * fx;
+        const bottom = h3 * (1 - fx) + h4 * fx;
+        
+        return top * (1 - fy) + bottom * fy;
+    }
+
+    async setChunkData(data) {
         if (!data || !data.dimensions) return;
         console.log("Renderer: Applying Chunk Data", data);
-        this.createGround(data.dimensions.width, data.dimensions.depth, data);
+        await this.createGround(data.dimensions.width, data.dimensions.depth, data);
         this.renderStaticObjects(data.staticObjects);
         
         // Update fog/background if specified
