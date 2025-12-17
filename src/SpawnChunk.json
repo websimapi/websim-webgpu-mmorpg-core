@@ -1,7 +1,7 @@
 {
   "id": "spawn_chunk_001",
   "name": "Neo-Genesis Plaza",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "dimensions": {
     "width": 1024,
     "height": 256,
@@ -10,7 +10,7 @@
   },
   "spawnPoint": {
     "x": 512,
-    "y": 45,
+    "y": 2,
     "z": 512,
     "facing": 180
   },
@@ -18,13 +18,13 @@
     "gravity": 9.81,
     "weather": "clear",
     "dayNightCycle": true,
-    "ambientColor": "#050510"
+    "ambientColor": "#050515"
   },
   "regions": [
     {
       "id": "r_central_hub",
       "name": "Central Hub",
-      "bounds": { "x": 450, "z": 450, "width": 124, "depth": 124 },
+      "bounds": { "x": 412, "z": 412, "width": 200, "depth": 200 },
       "pvp": false,
       "description": "Safe zone for new arrivals."
     },
@@ -34,7 +34,33 @@
       "bounds": { "x": 0, "z": 0, "width": 1024, "depth": 200 },
       "pvp": true,
       "description": "Dangerous open terrain."
+    },
+    {
+      "id": "r_market_district",
+      "name": "Neon Market",
+      "bounds": { "x": 650, "z": 400, "width": 150, "depth": 150 },
+      "pvp": false,
+      "description": "Trading hub."
+    },
+    {
+      "id": "r_data_spire",
+      "name": "The Data Spire",
+      "bounds": { "x": 500, "z": 800, "width": 50, "depth": 50 },
+      "pvp": true,
+      "description": "High value loot zone."
     }
+  ],
+  "staticObjects": [
+    { "type": "monolith", "x": 512, "y": 0, "z": 512, "sx": 10, "sy": 30, "sz": 10, "color": "#00ffaa" },
+    { "type": "tower", "x": 420, "y": 0, "z": 420, "sx": 20, "sy": 60, "sz": 20, "color": "#333333" },
+    { "type": "tower", "x": 604, "y": 0, "z": 420, "sx": 20, "sy": 60, "sz": 20, "color": "#333333" },
+    { "type": "tower", "x": 420, "y": 0, "z": 604, "sx": 20, "sy": 60, "sz": 20, "color": "#333333" },
+    { "type": "tower", "x": 604, "y": 0, "z": 604, "sx": 20, "sy": 60, "sz": 20, "color": "#333333" },
+    { "type": "arch", "x": 512, "y": 0, "z": 350, "sx": 40, "sy": 20, "sz": 10, "color": "#555555" },
+    { "type": "tree", "x": 480, "y": 0, "z": 480, "sx": 2, "sy": 8, "sz": 2, "color": "#00ff00" },
+    { "type": "tree", "x": 544, "y": 0, "z": 480, "sx": 2, "sy": 9, "sz": 2, "color": "#00ff00" },
+    { "type": "tree", "x": 480, "y": 0, "z": 544, "sx": 2, "sy": 7, "sz": 2, "color": "#00ff00" },
+    { "type": "tree", "x": 544, "y": 0, "z": 544, "sx": 2, "sy": 8, "sz": 2, "color": "#00ff00" }
   ],
   "terrainMap": {
     "type": "heightmap_reference",

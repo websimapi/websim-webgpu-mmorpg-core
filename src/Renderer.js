@@ -9,6 +9,7 @@ export class Renderer {
         this.peerMeshes = {};
         this.ground = null;
         this.grid = null;
+        this.staticMeshes = [];
     }
 
     init(containerId) {
@@ -136,12 +137,68 @@ export class Renderer {
         if (!data || !data.dimensions) return;
         console.log("Renderer: Applying Chunk Data", data);
         this.createGround(data.dimensions.width, data.dimensions.depth, data);
+        this.renderStaticObjects(data.staticObjects);
         
         // Update fog/background if specified
         if (data.environment && data.environment.ambientColor) {
             this.scene.background = new THREE.Color(data.environment.ambientColor);
             this.scene.fog = new THREE.FogExp2(data.environment.ambientColor, 0.0015);
         }
+    }
+
+    renderStaticObjects(objects) {
+        // Cleanup old
+        this.staticMeshes.forEach(mesh => this.scene.remove(mesh));
+        this.staticMeshes = [];
+
+        if (!objects || !Array.isArray(objects)) return;
+
+        objects.forEach(obj => {
+            let geo, mat;
+            const color = obj.color || 0x888888;
+            
+            switch(obj.type) {
+                case 'monolith':
+                    geo = new THREE.BoxGeometry(obj.sx, obj.sy, obj.sz);
+                    mat = new THREE.MeshStandardMaterial({ color: color, emissive: 0x00ff00, emissiveIntensity: 0.2 });
+                    break;
+                case 'tower':
+                    geo = new THREE.CylinderGeometry(obj.sx/2, obj.sx/1.5, obj.sy, 8);
+                    mat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.3 });
+                    break;
+                case 'tree':
+                    geo = new THREE.ConeGeometry(obj.sx, obj.sy, 8);
+                    mat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.9 });
+                    break;
+                case 'arch':
+                    geo = new THREE.TorusGeometry(obj.sx/2, obj.sz/2, 8, 16, Math.PI);
+                    mat = new THREE.MeshStandardMaterial({ color: color });
+                    break;
+                default:
+                    geo = new THREE.BoxGeometry(obj.sx, obj.sy, obj.sz);
+                    mat = new THREE.MeshStandardMaterial({ color: color });
+            }
+
+            const mesh = new THREE.Mesh(geo, mat);
+            // Objects are typically defined by bottom-center x,z. y is bottom.
+            // But ThreeJS primitives are centered.
+            let yOffset = obj.sy / 2;
+            if (obj.type === 'arch') yOffset = 0; // Torus center is center
+
+            mesh.position.set(obj.x, obj.y + yOffset, obj.z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            
+            // Special rotation for arch
+            if (obj.type === 'arch') {
+                mesh.rotation.x = 0; // Torus default lies flat-ish depending on implementation, let's adjust
+                // TorusGeometry(radius, tube, radialSegments, tubularSegments, arc)
+                // Default is in XY plane. We want it standing up.
+            }
+
+            this.scene.add(mesh);
+            this.staticMeshes.push(mesh);
+        });
     }
 
     onWindowResize() {

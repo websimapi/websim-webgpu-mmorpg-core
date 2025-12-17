@@ -39,6 +39,8 @@ export class GameEngine {
     const savedData = await this.db.init();
 
     // 4. Load Player Data from Slot 1
+    // NOTE: Persistence temporarily disabled for position to ensure "spawn in middle" for testing.
+    /*
     if (savedData.slot_1 && savedData.slot_1.x !== undefined) {
       this.player.loadFromData(savedData.slot_1);
       this.hasSavedState = true;
@@ -46,6 +48,9 @@ export class GameEngine {
     } else {
       console.log(`%c[GAME] No saved state found. Waiting for world entry to spawn.`, LOG_STYLES.sys);
     }
+    */
+    this.hasSavedState = false; 
+    console.log(`%c[GAME] Persistence Override: Always spawning at chunk default.`, LOG_STYLES.sys);
 
     // 5. Start Loop
     this.isRunning = true;
