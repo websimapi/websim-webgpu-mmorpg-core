@@ -112,10 +112,16 @@ export class GameEngine {
       this.chunkData = await response.json();
       console.log(`%c[WORLD] Loaded Chunk: ${this.chunkData.name}`, LOG_STYLES.sys, this.chunkData);
       
+      // Pass world data to renderer
+      if (this.renderer) {
+        this.renderer.setChunkData(this.chunkData);
+      }
+
       this.gameState = 'GAME';
 
       if (!this.hasSavedState) {
         const sp = this.chunkData.spawnPoint;
+        // Ensure teleport is respecting the terrain
         this.player.teleport(sp.x, sp.y, sp.z);
         this.logToUI(`Spawned at ${this.chunkData.name} [${sp.x}, ${sp.y}, ${sp.z}]`);
       } else {
