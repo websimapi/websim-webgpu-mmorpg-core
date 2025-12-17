@@ -1,12 +1,14 @@
 import { DatabaseManager } from './Database.js';
 import { NetworkManager } from './Network.js';
 import { Player } from './Player.js';
+import { Renderer } from './Renderer.js';
 import { CONFIG, LOG_STYLES, DEFAULT_SETTINGS } from './Constants.js';
 
 export class GameEngine {
   constructor() {
     this.player = new Player();
     this.network = new NetworkManager(this.player);
+    this.renderer = new Renderer();
     this.db = null; // Initialized after network
     this.lastSaveTime = 0;
     this.isRunning = false;
@@ -26,14 +28,17 @@ export class GameEngine {
   async start() {
     this.logToUI("Initializing Engine...");
     
-    // 1. Initialize Network
+    // 1. Initialize Renderer
+    this.renderer.init('game-container');
+
+    // 2. Initialize Network
     const room = await this.network.init();
 
-    // 2. Initialize Database (needs room)
+    // 3. Initialize Database (needs room)
     this.db = new DatabaseManager(room);
     const savedData = await this.db.init();
 
-    // 3. Load Player Data from Slot 1
+    // 4. Load Player Data from Slot 1
     if (savedData.slot_1 && savedData.slot_1.x !== undefined) {
       this.player.loadFromData(savedData.slot_1);
       this.hasSavedState = true;
@@ -42,7 +47,7 @@ export class GameEngine {
       console.log(`%c[GAME] No saved state found. Waiting for world entry to spawn.`, LOG_STYLES.sys);
     }
 
-    // 4. Start Loop
+    // 5. Start Loop
     this.isRunning = true;
     this.gameLoop();
     
@@ -77,8 +82,10 @@ export class GameEngine {
       this.lastSaveTime = now;
     }
 
-    // 3. "Render" (Placeholder for WebGPU)
-    // In a real implementation, this would call webgpuContext.draw()
+    // 3. Render
+    if (this.renderer) {
+      this.renderer.update(this.player, this.network.peers, this.network.room.clientId);
+    }
   }
 
   async savePlayerState() {
