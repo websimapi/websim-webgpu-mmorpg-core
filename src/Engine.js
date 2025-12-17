@@ -12,6 +12,8 @@ export class GameEngine {
     this.isRunning = false;
     this.gameState = 'TITLE'; // TITLE, SETTINGS, GAME
     this.settings = { ...DEFAULT_SETTINGS };
+    this.chunkData = null;
+    this.hasSavedState = false;
 
     // Bind methods for safe console usage
     this.move = this.move.bind(this);
@@ -32,16 +34,19 @@ export class GameEngine {
     const savedData = await this.db.init();
 
     // 3. Load Player Data from Slot 1
-    if (savedData.slot_1) {
+    if (savedData.slot_1 && savedData.slot_1.x !== undefined) {
       this.player.loadFromData(savedData.slot_1);
+      this.hasSavedState = true;
       console.log(`%c[GAME] Player position loaded from DB.`, LOG_STYLES.sys);
+    } else {
+      console.log(`%c[GAME] No saved state found. Waiting for world entry to spawn.`, LOG_STYLES.sys);
     }
 
     // 4. Start Loop
     this.isRunning = true;
     this.gameLoop();
     
-    this.logToUI("Engine Running. Open Console (F12) to interact.");
+    this.logToUI("Engine Running. Ready to Start.");
     console.log(`%c
     ========================================
     MMORPG ENGINE STARTED
@@ -89,6 +94,31 @@ export class GameEngine {
       return true;
     }
     return false;
+  }
+
+  async enterGame() {
+    this.logToUI("Loading Spawn Chunk...");
+    try {
+      const response = await fetch('./src/SpawnChunk.json');
+      if (!response.ok) throw new Error("Failed to load chunk data");
+      
+      this.chunkData = await response.json();
+      console.log(`%c[WORLD] Loaded Chunk: ${this.chunkData.name}`, LOG_STYLES.sys, this.chunkData);
+      
+      this.gameState = 'GAME';
+
+      if (!this.hasSavedState) {
+        const sp = this.chunkData.spawnPoint;
+        this.player.teleport(sp.x, sp.y, sp.z);
+        this.logToUI(`Spawned at ${this.chunkData.name} [${sp.x}, ${sp.y}, ${sp.z}]`);
+      } else {
+        this.logToUI(`Resumed at [${this.player.position.x}, ${this.player.position.y}, ${this.player.position.z}]`);
+      }
+
+    } catch (e) {
+      console.error(e);
+      this.logToUI(`Error loading world: ${e.message}`);
+    }
   }
 
   // --- Exposed Console API ---

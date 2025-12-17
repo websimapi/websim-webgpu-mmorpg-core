@@ -206,10 +206,9 @@
         // --- UI Interactions ---
 
         // Title Screen Buttons
-        document.getElementById('btn-start').addEventListener('click', () => {
+        document.getElementById('btn-start').addEventListener('click', async () => {
             document.getElementById('title-screen').classList.add('hidden');
-            window.game.gameState = 'GAME';
-            logSystem("Entering World...");
+            await window.game.enterGame();
         });
 
         document.getElementById('btn-settings').addEventListener('click', () => {

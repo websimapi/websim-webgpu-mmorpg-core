@@ -1,0 +1,46 @@
+{
+  "id": "spawn_chunk_001",
+  "name": "Neo-Genesis Plaza",
+  "version": "1.0.0",
+  "dimensions": {
+    "width": 1024,
+    "height": 256,
+    "depth": 1024,
+    "scale": 1.0
+  },
+  "spawnPoint": {
+    "x": 512,
+    "y": 45,
+    "z": 512,
+    "facing": 180
+  },
+  "environment": {
+    "gravity": 9.81,
+    "weather": "clear",
+    "dayNightCycle": true,
+    "ambientColor": "#050510"
+  },
+  "regions": [
+    {
+      "id": "r_central_hub",
+      "name": "Central Hub",
+      "bounds": { "x": 450, "z": 450, "width": 124, "depth": 124 },
+      "pvp": false,
+      "description": "Safe zone for new arrivals."
+    },
+    {
+      "id": "r_north_wastes",
+      "name": "Northern Wastes",
+      "bounds": { "x": 0, "z": 0, "width": 1024, "depth": 200 },
+      "pvp": true,
+      "description": "Dangerous open terrain."
+    }
+  ],
+  "terrainMap": {
+    "type": "heightmap_reference",
+    "resolution": 64,
+    "data_layout": "row_major",
+    "base_height": 0
+  }
+}
+
