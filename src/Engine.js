@@ -3,13 +3,19 @@ import { NetworkManager } from './Network.js';
 import { Player } from './Player.js';
 import { CONFIG, LOG_STYLES } from './Constants.js';
 
-class GameEngine {
+export class GameEngine {
   constructor() {
     this.player = new Player();
     this.network = new NetworkManager(this.player);
     this.db = null; // Initialized after network
     this.lastSaveTime = 0;
     this.isRunning = false;
+
+    // Bind methods for safe console usage
+    this.move = this.move.bind(this);
+    this.tp = this.tp.bind(this);
+    this.chat = this.chat.bind(this);
+    this.status = this.status.bind(this);
   }
 
   async start() {
@@ -75,15 +81,24 @@ class GameEngine {
 
   // --- Exposed Console API ---
 
-  move(x, y, z) { this.player.move(x, y, z); }
-  tp(x, y, z) { this.player.teleport(x, y, z); }
+  move(x, y, z) { 
+    this.player.move(x, y, z); 
+    return `Moved to [${this.player.position.x.toFixed(2)}, ${this.player.position.y.toFixed(2)}, ${this.player.position.z.toFixed(2)}]`;
+  }
+
+  tp(x, y, z) { 
+    this.player.teleport(x, y, z); 
+    return `Teleported to [${x}, ${y}, ${z}]`;
+  }
   
   chat(message) {
+    if (!this.db || !this.db.currentUser) return "Error: DB not ready";
     this.network.room.send({
       type: 'chat',
       username: this.db.currentUser.username,
       message: message
     });
+    return `Chat sent: "${message}"`;
   }
 
   status() {
@@ -101,7 +116,5 @@ class GameEngine {
   }
 }
 
-// Attach to window for user interaction
-window.game = new GameEngine();
-window.game.start();
+// Engine is now exported. Instantiation happens in index.html to control scope and UI binding.
 

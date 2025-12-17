@@ -30,10 +30,34 @@
             background: rgba(0, 0, 0, 0.8);
             padding: 10px;
             border: 1px solid #00ff00;
-            max-height: 200px;
+            flex-grow: 1;
             overflow-y: auto;
             pointer-events: auto;
             text-shadow: 0 0 5px #00ff00;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .input-line {
+            display: flex;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid #00ff00;
+            padding: 5px;
+            pointer-events: auto;
+        }
+        .input-line span {
+            margin-right: 10px;
+            font-weight: bold;
+            color: #00ff00;
+        }
+        #cmd-input {
+            flex-grow: 1;
+            background: transparent;
+            border: none;
+            color: #00ff00;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            outline: none;
         }
         h1 {
             text-align: center;
@@ -49,10 +73,97 @@
 
     <div id="ui-layer">
         <div id="console-out">Initializing System...<br></div>
+        <div class="input-line">
+            <span>></span>
+            <input type="text" id="cmd-input" placeholder="Enter command (e.g. move 1 0 0)" autocomplete="off">
+        </div>
     </div>
 
     <!-- Scripts -->
-    <script type="module" src="./src/Engine.js"></script>
+    <script type="module">
+        import { GameEngine } from './src/Engine.js';
+
+        // Initialize Game
+        async function init() {
+            try {
+                window.game = new GameEngine();
+                await window.game.start();
+                
+                logSystem("Game Ready. Type commands below or use DevTools console.");
+                logSystem("Try: 'move 10 0 0' or 'help'");
+                
+                // Focus input
+                document.getElementById('cmd-input').focus();
+            } catch (e) {
+                console.error(e);
+                logSystem(`CRITICAL ERROR: ${e.message}`, 'red');
+            }
+        }
+
+        function logSystem(msg, color = '#00ff00') {
+            const el = document.getElementById('console-out');
+            const div = document.createElement('div');
+            div.style.color = color;
+            div.textContent = `> ${msg}`;
+            el.appendChild(div);
+            el.scrollTop = el.scrollHeight;
+        }
+
+        // Command Parser
+        const input = document.getElementById('cmd-input');
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const cmdText = input.value.trim();
+                input.value = '';
+                if (cmdText) processCommand(cmdText);
+            }
+        });
+
+        function processCommand(raw) {
+            logSystem(raw, '#ffff00');
+            
+            if (!window.game || !window.game.isRunning) {
+                logSystem("Engine not running.", 'red');
+                return;
+            }
+
+            const parts = raw.split(/\s+/);
+            const cmd = parts[0].toLowerCase();
+            const args = parts.slice(1).map(Number); // Convert args to numbers
+
+            try {
+                let res;
+                switch (cmd) {
+                    case 'move':
+                        if (args.length < 3 || args.some(isNaN)) throw new Error("Usage: move x y z");
+                        res = window.game.move(args[0], args[1], args[2]);
+                        break;
+                    case 'tp':
+                        if (args.length < 3 || args.some(isNaN)) throw new Error("Usage: tp x y z");
+                        res = window.game.tp(args[0], args[1], args[2]);
+                        break;
+                    case 'chat':
+                        const msg = raw.substring(5).trim();
+                        res = window.game.chat(msg);
+                        break;
+                    case 'status':
+                        window.game.status();
+                        res = "Status printed to DevTools Console.";
+                        break;
+                    case 'help':
+                        res = "Commands: move <x> <y> <z>, tp <x> <y> <z>, chat <msg>, status";
+                        break;
+                    default:
+                        res = "Unknown command. Type 'help' for list.";
+                }
+                logSystem(res, '#ccc');
+            } catch (err) {
+                logSystem(`Error: ${err.message}`, 'red');
+            }
+        }
+
+        init();
+    </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
